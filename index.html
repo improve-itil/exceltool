@@ -2,22 +2,60 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>השוואת קבצי Excel</title>
+  <title>🔍 השוואת קבצי Excel</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    body { font-family: Arial; direction: rtl; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
-    th { background-color: #f0f0f0; }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      direction: rtl;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    h2 {
+      color: #333;
+    }
+    label {
+      display: block;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #f0ad4e;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #ec971f;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 30px;
+      background-color: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: right;
+    }
+    th {
+      background-color: #f2f2f2;
+      color: #333;
+    }
+    tr.diff-row {
+      background-color: #fff4e5;
+    }
   </style>
 </head>
 <body>
 
   <h2>🔍 השוואת קבצי Excel</h2>
 
-  <label>קובץ ראשון: <input type="file" id="file1" /></label><br><br>
-  <label>קובץ שני: <input type="file" id="file2" /></label><br><br>
-
+  <label>קובץ ראשון: <input type="file" id="file1" /></label>
+  <label>קובץ שני: <input type="file" id="file2" /></label>
   <button onclick="compareExcels()">בדיקה</button>
 
   <div id="result"></div>
@@ -55,7 +93,7 @@
       data1.forEach((row1, i) => {
         const row2 = data2[i];
         if (!row2) {
-          diffs.push({ index: i + 1, type: "חסרה שורה בקובץ 2", row1, row2: {} });
+          diffs.push({ index: i + 1, type: "שורה חסרה בקובץ 2", row1, row2: {} });
         } else {
           Object.keys(row1).forEach(key => {
             if (row1[key] !== row2[key]) {
@@ -70,23 +108,37 @@
         }
       });
 
-      // תצוגה
-      let html = "<table><tr><th>שורה</th><th>עמודה</th><th>קובץ 1</th><th>קובץ 2</th></tr>";
+      if (data2.length > data1.length) {
+        for (let i = data1.length; i < data2.length; i++) {
+          diffs.push({ index: i + 1, type: "שורה חסרה בקובץ 1", row1: {}, row2: data2[i] });
+        }
+      }
+
+      let html = "";
+
       if (diffs.length === 0) {
         html = "<p>✔️ אין הבדלים בין הקבצים</p>";
       } else {
+        html = "<table><tr><th>שורה</th><th>עמודה</th><th>קובץ 1</th><th>קובץ 2</th><th>הערה</th></tr>";
         diffs.forEach(diff => {
-          html += `<tr>
+          const val1 = diff.value1 !== undefined ? diff.value1 : formatRow(diff.row1);
+          const val2 = diff.value2 !== undefined ? diff.value2 : formatRow(diff.row2);
+          html += `<tr class="diff-row">
             <td>${diff.index}</td>
             <td>${diff.column || "-"}</td>
-            <td>${diff.value1 || JSON.stringify(diff.row1)}</td>
-            <td>${diff.value2 || JSON.stringify(diff.row2)}</td>
+            <td>${val1}</td>
+            <td>${val2}</td>
+            <td>${diff.column ? "ערך שונה" : diff.type}</td>
           </tr>`;
         });
         html += "</table>";
       }
 
       document.getElementById("result").innerHTML = html;
+    }
+
+    function formatRow(row) {
+      return Object.keys(row).length === 0 ? "" : Object.entries(row).map(([k, v]) => `${k}: ${v}`).join(" | ");
     }
   </script>
 
