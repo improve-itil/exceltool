@@ -48,6 +48,9 @@
     tr.diff-row {
       background-color: #fff4e5;
     }
+    tr.action-row {
+      background-color: #e5f9ff;
+    }
   </style>
 </head>
 <body>
@@ -88,60 +91,59 @@
       const data1 = await readExcel(file1);
       const data2 = await readExcel(file2);
 
-      const diffs = [];
+      const actions = [];
 
-      data1.forEach((row1, i) => {
-        const row2 = data2[i];
-        if (!row2) {
-          diffs.push({ index: i + 1, type: "שורה חסרה בקובץ 2", row1, row2: {} });
-        } else {
-          Object.keys(row1).forEach(key => {
-            if (row1[key] !== row2[key]) {
-              diffs.push({
-                index: i + 1,
-                column: key,
-                value1: row1[key],
-                value2: row2[key],
-              });
-            }
-          });
+      if (data1.length === 0 || data2.length === 0) {
+        document.getElementById("result").innerHTML = "<p>📭 אחד הקבצים ריק</p>";
+        return;
+      }
+
+      // מציאת מפתח השוואה משותף (למשל "שם")
+      const commonKeys = Object.keys(data1[0]).filter(key => key && Object.keys(data2[0]).includes(key));
+      const comparisonKey = commonKeys[0];
+
+      if (!comparisonKey) {
+        document.getElementById("result").innerHTML = "<p>⚠️ לא נמצאה עמודה משותפת להשוואה בין הקבצים</p>";
+        return;
+      }
+
+      const map1 = new Map();
+      const map2 = new Map();
+
+      data1.forEach(row => {
+        if (row[comparisonKey]) map1.set(row[comparisonKey].toString().trim(), row);
+      });
+      data2.forEach(row => {
+        if (row[comparisonKey]) map2.set(row[comparisonKey].toString().trim(), row);
+      });
+
+      map1.forEach((row1, key) => {
+        if (!map2.has(key)) {
+          actions.push({ action: 'מחק מהמערכת', key, data: row1 });
         }
       });
 
-      if (data2.length > data1.length) {
-        for (let i = data1.length; i < data2.length; i++) {
-          diffs.push({ index: i + 1, type: "שורה חסרה בקובץ 1", row1: {}, row2: data2[i] });
+      map2.forEach((row2, key) => {
+        if (!map1.has(key)) {
+          actions.push({ action: 'הוסף למערכת', key, data: row2 });
         }
-      }
+      });
 
       let html = "";
-
-      if (diffs.length === 0) {
-        html = "<p>✔️ אין הבדלים בין הקבצים</p>";
+      if (actions.length === 0) {
+        html += "<p>✔️ אין משתמשים שדורשים הוספה או מחיקה</p>";
       } else {
-        html = "<table><tr><th>שורה</th><th>עמודה</th><th>קובץ 1</th><th>קובץ 2</th><th>הערה</th></tr>";
-        diffs.forEach(diff => {
-          const val1 = diff.value1 !== undefined ? diff.value1 : formatRow(diff.row1);
-          const val2 = diff.value2 !== undefined ? diff.value2 : formatRow(diff.row2);
-          html += `<tr class="diff-row">
-            <td>${diff.index}</td>
-            <td>${diff.column || "-"}</td>
-            <td>${val1}</td>
-            <td>${val2}</td>
-            <td>${diff.column ? "ערך שונה" : diff.type}</td>
+        html += `<table><tr><th>${comparisonKey}</th><th>פעולה</th></tr>`;
+        actions.forEach(a => {
+          html += `<tr class="action-row">
+            <td>${a.key}</td>
+            <td>${a.action}</td>
           </tr>`;
         });
         html += "</table>";
       }
 
       document.getElementById("result").innerHTML = html;
-    }
-
-    function formatRow(row) {
-      if (!row || typeof row !== 'object') return '';
-      const entries = Object.entries(row).filter(([k, v]) => v !== undefined && v !== null && v !== '');
-      if (entries.length === 0) return '—';
-      return entries.map(([k, v]) => `${k}: ${v}`).join(" | ");
     }
   </script>
 
