@@ -138,7 +138,10 @@
     }
 
     function formatRow(row) {
-      return Object.keys(row).length === 0 ? "" : Object.entries(row).map(([k, v]) => `${k}: ${v}`).join(" | ");
+      if (!row || typeof row !== 'object') return '';
+      const entries = Object.entries(row).filter(([k, v]) => v !== undefined && v !== null && v !== '');
+      if (entries.length === 0) return '—';
+      return entries.map(([k, v]) => `${k}: ${v}`).join(" | ");
     }
   </script>
 
