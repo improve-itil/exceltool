@@ -2,115 +2,93 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>כלי ניהול משתמשים מקובצי Excel</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <title>השוואת קבצי Excel</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      direction: rtl;
-      background-color: #f9f9f9;
-      padding: 40px;
-      color: #333;
-    }
-
-    h2 {
-      text-align: center;
-      color: #2c3e50;
-    }
-
-    .container {
-      max-width: 500px;
-      margin: auto;
-      padding: 20px;
-      background-color: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    label {
-      display: block;
-      margin-top: 20px;
-      font-weight: bold;
-    }
-
-    input[type="file"] {
-      margin-top: 5px;
-      width: 100%;
-    }
-
-    button {
-      margin-top: 30px;
-      padding: 12px 20px;
-      background-color: #3498db;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      width: 100%;
-    }
-
-    button:hover {
-      background-color: #2980b9;
-    }
+    body { font-family: Arial; direction: rtl; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
+    th { background-color: #f0f0f0; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>כלי לניהול משתמשים מקובצי Excel</h2>
 
-    <label>קובץ רשימת משתמשים קיימת:</label>
-    <input type="file" id="baseFile">
+  <h2>🔍 השוואת קבצי Excel</h2>
 
-    <label>קובץ משתמשים להוספה:</label>
-    <input type="file" id="addFile">
+  <label>קובץ ראשון: <input type="file" id="file1" /></label><br><br>
+  <label>קובץ שני: <input type="file" id="file2" /></label><br><br>
 
-    <label>קובץ משתמשים להסרה:</label>
-    <input type="file" id="removeFile">
+  <button onclick="compareExcels()">בדיקה</button>
 
-    <button onclick="processFiles()">אישור</button>
-  </div>
+  <div id="result"></div>
 
   <script>
     async function readExcel(file) {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet);
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
           resolve(json);
         };
+        reader.onerror = reject;
         reader.readAsArrayBuffer(file);
       });
     }
 
-    async function processFiles() {
-      const baseFile = document.getElementById('baseFile').files[0];
-      if (!baseFile) return alert('יש להעלות קובץ בסיסי');
+    async function compareExcels() {
+      const file1 = document.getElementById("file1").files[0];
+      const file2 = document.getElementById("file2").files[0];
 
-      const addFile = document.getElementById('addFile').files[0];
-      const removeFile = document.getElementById('removeFile').files[0];
+      if (!file1 || !file2) {
+        alert("יש לבחור שני קבצים!");
+        return;
+      }
 
-      const baseUsers = await readExcel(baseFile);
-      const addUsers = addFile ? await readExcel(addFile) : [];
-      const removeUsers = removeFile ? await readExcel(removeFile) : [];
+      const data1 = await readExcel(file1);
+      const data2 = await readExcel(file2);
 
-      const userMap = new Map(baseUsers.map(u => [u.email, u]));
+      const diffs = [];
 
-      addUsers.forEach(u => userMap.set(u.email, u));
-      removeUsers.forEach(u => userMap.delete(u.email));
+      data1.forEach((row1, i) => {
+        const row2 = data2[i];
+        if (!row2) {
+          diffs.push({ index: i + 1, type: "חסרה שורה בקובץ 2", row1, row2: {} });
+        } else {
+          Object.keys(row1).forEach(key => {
+            if (row1[key] !== row2[key]) {
+              diffs.push({
+                index: i + 1,
+                column: key,
+                value1: row1[key],
+                value2: row2[key],
+              });
+            }
+          });
+        }
+      });
 
-      const finalUsers = Array.from(userMap.values());
-      const ws = XLSX.utils.json_to_sheet(finalUsers);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'משתמשים');
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'users_updated.xlsx');
+      // תצוגה
+      let html = "<table><tr><th>שורה</th><th>עמודה</th><th>קובץ 1</th><th>קובץ 2</th></tr>";
+      if (diffs.length === 0) {
+        html = "<p>✔️ אין הבדלים בין הקבצים</p>";
+      } else {
+        diffs.forEach(diff => {
+          html += `<tr>
+            <td>${diff.index}</td>
+            <td>${diff.column || "-"}</td>
+            <td>${diff.value1 || JSON.stringify(diff.row1)}</td>
+            <td>${diff.value2 || JSON.stringify(diff.row2)}</td>
+          </tr>`;
+        });
+        html += "</table>";
+      }
+
+      document.getElementById("result").innerHTML = html;
     }
   </script>
+
 </body>
 </html>
